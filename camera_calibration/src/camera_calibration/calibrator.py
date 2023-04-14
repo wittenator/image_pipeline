@@ -47,6 +47,8 @@ import time
 from distutils.version import LooseVersion
 from enum import Enum
 
+print(cv2.__version__)
+
 # Supported camera models
 class CAMERA_MODEL(Enum):
     PINHOLE = 0
@@ -73,11 +75,14 @@ class ChessboardInfo():
             self.aruco_dict = cv2.aruco.getPredefinedDictionary({
                 "aruco_orig" : cv2.aruco.DICT_ARUCO_ORIGINAL,
                 "4x4_250"    : cv2.aruco.DICT_4X4_250,
+                "4x4_1000"    : cv2.aruco.DICT_4X4_1000,
                 "5x5_250"    : cv2.aruco.DICT_5X5_250,
                 "6x6_250"    : cv2.aruco.DICT_6X6_250,
                 "7x7_250"    : cv2.aruco.DICT_7X7_250}[aruco_dict])
-            self.charuco_board = cv2.aruco.CharucoBoard_create(self.n_cols, self.n_rows, self.dim, self.marker_size,
+            self.charuco_board = cv2.aruco.CharucoBoard((self.n_cols, self.n_rows), self.dim, self.marker_size,
                     self.aruco_dict)
+            self.aruco_parameters = cv2.aruco.DetectorParameters()
+            self.aruco_detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.aruco_parameters)
 
 # Make all private!!!!!
 def lmin(seq1, seq2):
@@ -244,7 +249,7 @@ def _get_corners(img, board, refine = True, checkerboard_flags=0):
 
     return (ok, corners)
 
-def _get_charuco_corners(img, board, refine):
+def _get_charuco_corners(aruco_detector, img, board, refine):
     """
     Get chessboard corners from image of ChArUco board
     """
@@ -256,7 +261,7 @@ def _get_charuco_corners(img, board, refine):
     else:
         mono = img
 
-    marker_corners, marker_ids, _ = cv2.aruco.detectMarkers(img, board.aruco_dict)
+    marker_corners, marker_ids, _ = aruco_detector.detectMarkers(img, board.aruco_dict)
     if len(marker_corners) == 0:
         return (False, None, None)
     _, square_corners, ids = cv2.aruco.interpolateCornersCharuco(marker_corners, marker_ids, img, board.charuco_board)
@@ -520,7 +525,7 @@ class Calibrator():
         # Scale the input image down to ~VGA size
         height = img.shape[0]
         width = img.shape[1]
-        scale = math.sqrt( (width*height) / (640.*480.) )
+        scale = math.sqrt( (width*height) / (1280.*960.) )
         if scale > 1.0:
             scrib = cv2.resize(img, (int(width / scale), int(height / scale)))
         else:
