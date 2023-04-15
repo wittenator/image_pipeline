@@ -47,8 +47,6 @@ import time
 from distutils.version import LooseVersion
 from enum import Enum
 
-print(cv2.__version__)
-
 # Supported camera models
 class CAMERA_MODEL(Enum):
     PINHOLE = 0
@@ -83,6 +81,8 @@ class ChessboardInfo():
                     self.aruco_dict)
             self.aruco_parameters = cv2.aruco.DetectorParameters()
             self.aruco_detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.aruco_parameters)
+            self.charuco_detector = cv2.aruco.CharucoDetector(self.charuco_board)
+            print(self.pattern == Patterns.ChArUco)
 
 # Make all private!!!!!
 def lmin(seq1, seq2):
@@ -249,7 +249,7 @@ def _get_corners(img, board, refine = True, checkerboard_flags=0):
 
     return (ok, corners)
 
-def _get_charuco_corners(aruco_detector, img, board, refine):
+def _get_charuco_corners(img, board, refine):
     """
     Get chessboard corners from image of ChArUco board
     """
@@ -261,10 +261,10 @@ def _get_charuco_corners(aruco_detector, img, board, refine):
     else:
         mono = img
 
-    marker_corners, marker_ids, _ = aruco_detector.detectMarkers(img, board.aruco_dict)
+    marker_corners, marker_ids, _ = board.aruco_detector.detectMarkers(img)
     if len(marker_corners) == 0:
         return (False, None, None)
-    _, square_corners, ids = cv2.aruco.interpolateCornersCharuco(marker_corners, marker_ids, img, board.charuco_board)
+    square_corners, ids, _, _ = board.charuco_detector.detectBoard(img)
     return ((square_corners is not None) and (len(square_corners) > 5), square_corners, ids)
 
 def _get_circles(img, board, pattern):
@@ -766,12 +766,13 @@ class MonoCalibrator(Calibrator):
         intrinsics_in = numpy.eye(3, dtype=numpy.float64)
 
         if self.pattern == Patterns.ChArUco:
+            print("cal", self.pattern == Patterns.ChArUco)
             if self.camera_model == CAMERA_MODEL.FISHEYE:
                 raise NotImplemented("Can't perform fisheye calibration with ChArUco board")
 
             reproj_err, self.intrinsics, self.distortion, rvecs, tvecs = cv2.aruco.calibrateCameraCharuco(
                     ipts, ids, boards[0].charuco_board, self.size, intrinsics_in, None)
-
+            print(reproj_err)
         elif self.camera_model == CAMERA_MODEL.PINHOLE:
             print("mono pinhole calibration...")
             reproj_err, self.intrinsics, dist_coeffs, rvecs, tvecs = cv2.calibrateCamera(
